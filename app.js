@@ -3,7 +3,10 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
+const bcrypt = require("bcrypt");
+const saltrounds = 10;
+// const md5 = require("md5");
+// const encrypt = require("mongoose-encryption");
 
 const app = express();
 
@@ -27,8 +30,8 @@ const userSchema = new mongoose.Schema({
   },
 });
 
-const secret = process.env.SECRET;
-userSchema.plugin(encrypt, { secret: secret, encryptedFields: ["password"] });
+// const secret = process.env.SECRET;
+// userSchema.plugin(encrypt, { secret: secret, encryptedFields: ["password"] });
 
 const User = mongoose.model("user", userSchema);
 
@@ -46,15 +49,21 @@ app.post("/register", (req, res) => {
   const email = req.body.username;
   const password = req.body.password;
 
-  const newUser = new User({
-    email: email,
-    password: password,
-  });
-  newUser.save((err) => {
-    if (!err) {
-      res.render("secrets");
-    } else {
+  bcrypt.hash(password, saltrounds, (err, hash) => {
+    if (err) {
       console.log(err);
+    } else {
+      const newUser = new User({
+        email: email,
+        password: hash,
+      });
+      newUser.save((err) => {
+        if (!err) {
+          res.render("secrets");
+        } else {
+          console.log(err);
+        }
+      });
     }
   });
 });
@@ -64,8 +73,12 @@ app.post("/login", (req, res) => {
     if (err) {
       console.log(err);
     } else {
-      if (foundUser.password === req.body.password) {
-        res.render("secrets");
+      if (foundUser) {
+        bcrypt.compare(req.body.password, foundUser.password, (err, result) => {
+          if (result === true) {
+            res.render("secrets");
+          }
+        });
       }
     }
   });
